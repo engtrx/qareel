@@ -9,20 +9,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Unpack project
         run: unzip -o qareeb-project.zip
+        
+      - name: Force Universal ABI Architecture
+        run: |
+          # هذا الأمر يبحث عن إعدادات التطبيق ويضيف دعم جميع المعالجات تلقائياً
+          sed -i "/defaultConfig {/a \        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64' }" app/build.gradle
+          
       - name: Download Inter font
         continue-on-error: true
         run: curl -fL -o app/src/main/assets/Inter.ttf "https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf"
+        
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+          
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
+          
       - name: Build
         run: gradle clean assembleDebug --no-daemon
+        
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
