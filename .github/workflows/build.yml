@@ -13,15 +13,18 @@ jobs:
       - name: Unpack project
         run: unzip -o qareeb-project.zip
         
-      - name: Force Universal ABI Architecture
+      - name: Fix Architecture Automatically
         run: |
-          # هذا الأمر يبحث عن إعدادات التطبيق ويضيف دعم جميع المعالجات تلقائياً
-          sed -i "/defaultConfig {/a \        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64' }" app/build.gradle
+          # البحث عن ملف build.gradle داخل مجلد app أينما كان
+          BUILD_FILE=$(find . -name "build.gradle" -path "*/app/*" | head -n 1)
+          if [ -n "$BUILD_FILE" ]; then
+            echo "تم العثور على الملف في: $BUILD_FILE"
+            sed -i "/defaultConfig {/a \        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64' }" "$BUILD_FILE"
+            echo "تمت إضافة دعم المعالجات بنجاح."
+          else
+            echo "لم يتم العثور على ملف build.gradle"
+          fi
           
-      - name: Download Inter font
-        continue-on-error: true
-        run: curl -fL -o app/src/main/assets/Inter.ttf "https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf"
-        
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -32,11 +35,20 @@ jobs:
           gradle-version: 8.7
           
       - name: Build
-        run: gradle clean assembleDebug --no-daemon
-        
+        run: |
+          # البحث عن مكان gradlew والدخول إليه للبناء
+          PROJECT_DIR=$(dirname "$(find . -name gradlew -type f | head -n 1)")
+          cd "$PROJECT_DIR"
+          gradle clean assembleDebug --no-daemon
+          
+      - name: Copy APK to root
+        run: |
+          # نسخ ملف APK إلى المجلد الرئيسي لسهولة رفعه
+          find . -name "app-debug.apk" -exec cp {} ./app-debug.apk \;
+          
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
           name: قريب v${{ github.run_number }}
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app-debug.apk
